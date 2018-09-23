@@ -1237,7 +1237,8 @@ static int vidioc_enum_frameintervals(struct file *filp, void *priv,
 	__u32 i;
 
 	if (gspca_dev->cam.mode_framerates == NULL ||
-			gspca_dev->cam.mode_framerates[mode].nrates == 0)
+			(gspca_dev->cam.mode_framerates[mode].nrates == 0 &&
+			 gspca_dev->cam.mode_framerates[mode].nfract_rates == 0))
 		return -EINVAL;
 
 	if (fival->pixel_format !=
@@ -1246,10 +1247,20 @@ static int vidioc_enum_frameintervals(struct file *filp, void *priv,
 
 	for (i = 0; i < gspca_dev->cam.mode_framerates[mode].nrates; i++) {
 		if (fival->index == i) {
-			fival->type = V4L2_FRMSIZE_TYPE_DISCRETE;
+			fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
 			fival->discrete.numerator = 1;
 			fival->discrete.denominator =
 				gspca_dev->cam.mode_framerates[mode].rates[i];
+			return 0;
+		}
+	}
+	for (i = 0; i < gspca_dev->cam.mode_framerates[mode].nfract_rates; i++) {
+		if (fival->index == i + gspca_dev->cam.mode_framerates[mode].nrates) {
+			fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
+			fival->discrete.numerator =
+				gspca_dev->cam.mode_framerates[mode].fract_rates[i].numerator;
+			fival->discrete.denominator =
+				gspca_dev->cam.mode_framerates[mode].fract_rates[i].denominator;
 			return 0;
 		}
 	}
