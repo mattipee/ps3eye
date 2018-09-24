@@ -100,7 +100,7 @@ static void sd_stopN(struct gspca_dev *gspca_dev);
 
 #if RAW10
 
-	#define PIX_FMT      V4L2_PIX_FMT_SGRBG10
+	#define PIX_FMT      V4L2_PIX_FMT_SGRBG10P
 	#define BYTESPERLINE 800 /* 640*1.25 */
 	#define SIZEIMAGE    800 * 480 /* 640*1.25 * 480 */
 	#define COLORSPACE   V4L2_COLORSPACE_RAW
