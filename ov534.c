@@ -96,18 +96,57 @@ static int sd_start(struct gspca_dev *gspca_dev);
 static void sd_stopN(struct gspca_dev *gspca_dev);
 
 
+#define RAW10 0
+
+#if RAW10
+
+	#define PIX_FMT      V4L2_PIX_FMT_SGRBG10
+	#define BYTESPERLINE 800 /* 640*1.25 */
+	#define SIZEIMAGE    800 * 480 /* 640*1.25 * 480 */
+	#define COLORSPACE   V4L2_COLORSPACE_RAW
+
+	/* frame size = 0x017700 * 4 = 38400 (640 8 480 @ 10bpp) */
+	#define FRAME_H 0x01
+	#define FRAME_M 0x77
+	#define FRAME_L 0x00
+
+	#define COM7 0x03 /* Bayer RAW */
+	#define V_FMT 0x10 /* RAW10 */
+	#define DSP_Ctrl4 0x03
+
+#else // RAW8
+
+	//#define PIX_FMT      V4L2_PIX_FMT_SGRBG8
+	#define PIX_FMT      V4L2_PIX_FMT_GREY
+	#define BYTESPERLINE 640
+	#define SIZEIMAGE    640 * 480
+	#define COLORSPACE   V4L2_COLORSPACE_RAW
+
+	/* frame size = 0x012c00 * 4 = 307200 (640 8 480 @ 8bpp) */
+	#define FRAME_H 0x01
+	#define FRAME_M 0x2c
+	#define FRAME_L 0x00
+
+	#define COM7 0x01 /* Processed Bayer RAW */
+	#define V_FMT 0x00 /* RAW8 */
+	#define DSP_Ctrl4 0x02
+
+#endif
+
 static const struct v4l2_pix_format ov772x_mode[] = {
-	{320, 240, V4L2_PIX_FMT_GREY, V4L2_FIELD_NONE,
+	{320, 240, PIX_FMT, V4L2_FIELD_NONE,
 	 .bytesperline = 320,
 	 .sizeimage = 320 * 240,
 	 .colorspace = V4L2_COLORSPACE_RAW,
 	 .priv = 1},
-	{640, 480, V4L2_PIX_FMT_GREY, V4L2_FIELD_NONE,
-	 .bytesperline = 640,
-	 .sizeimage = 640 * 480,
-	 .colorspace = V4L2_COLORSPACE_RAW,
+	{640, 480, PIX_FMT, V4L2_FIELD_NONE,
+	 .bytesperline = BYTESPERLINE,
+	 .sizeimage = SIZEIMAGE,
+	 .colorspace = COLORSPACE,
 	 .priv = 0},
 };
+
+
 static const struct v4l2_pix_format ov767x_mode[] = {
 	{320, 240, V4L2_PIX_FMT_JPEG, V4L2_FIELD_NONE,
 		.bytesperline = 320,
@@ -453,13 +492,13 @@ static const u8 bridge_init_772x[][2] = {
 
 	{ 0x1c, 0x00 },     /* video data start (V_FMT) */
 
-	{ 0x1d, 0x00 },     /* RAW8 mode */
+	{ 0x1d, V_FMT },
 	{ 0x1d, 0x02 },     /* payload size 0x0200 * 4 = 2048 bytes */
 	{ 0x1d, 0x00 },     /* payload size */
 
-	{ 0x1d, 0x01 },     /* frame size = 0x012C00 * 4 = 307200 bytes (640 * 480 @ 8bpp) */
-	{ 0x1d, 0x2c },     /* frame size */
-	{ 0x1d, 0x00 },     /* frame size */
+	{ 0x1d, FRAME_H },
+	{ 0x1d, FRAME_M },
+	{ 0x1d, FRAME_L },
 
 	{ 0x1c, 0x0a },     /* video data start (V_CNTL0) */
 	{ 0x1d, 0x08 },     /* turn on UVC header */
@@ -479,7 +518,7 @@ static const u8 sensor_init_772x[][2] = {
 	{ 0x12, 0x80 },     /* reset */
 	{ 0x3d, 0x00 },
 
-	{ 0x12, 0x01 },     /* Processed Bayer RAW (8bit) */
+	{ 0x12, COM7 },
 
 	{ 0x11, 0x01 },
 	{ 0x14, 0x40 },
@@ -487,7 +526,7 @@ static const u8 sensor_init_772x[][2] = {
 	{ 0x63, 0xaa },     // AWB  
 	{ 0x64, 0x87 },
 	{ 0x66, 0x00 },
-	{ 0x67, 0x02 },
+	{ 0x67, DSP_Ctrl4 },
 	{ 0x17, 0x26 },
 	{ 0x18, 0xa0 },
 	{ 0x19, 0x07 },
@@ -518,17 +557,17 @@ static const u8 sensor_init_772x[][2] = {
 };
 static const u8 bridge_start_vga_772x[][2] = {
 	{0x1c, 0x00},
-	{0x1d, 0x00},
+	{0x1d, V_FMT},     /* RAW8/RAW10 mode */
 	{0x1d, 0x02},
 	{0x1d, 0x00},
-	{0x1d, 0x01},   /* frame size = 0x012C00 * 4 = 307200 bytes (640 * 480 @ 8bpp) */
-	{0x1d, 0x2c},   /* frame size */
-	{0x1d, 0x00},   /* frame size */
+	{0x1d, FRAME_H},
+	{0x1d, FRAME_M},
+	{0x1d, FRAME_L},
 	{0xc0, 0x50},
 	{0xc1, 0x3c},
 };
 static const u8 sensor_start_vga_772x[][2] = {
-	{0x12, 0x01},
+	{0x12, COM7},
 	{0x17, 0x26},
 	{0x18, 0xa0},
 	{0x19, 0x07},
