@@ -96,53 +96,41 @@ static int sd_start(struct gspca_dev *gspca_dev);
 static void sd_stopN(struct gspca_dev *gspca_dev);
 
 
-#define RAW10 0
+/* frame size = 0x012c00 * 4 = 307200 (640 8 480 @ 8bpp) */
+#define RAW8_FRAME_H 0x01
+#define RAW8_FRAME_M 0x2c
+#define RAW8_FRAME_L 0x00
 
-#if RAW10
+#define RAW8_COM7 0x01 /* Processed Bayer RAW */
+#define RAW8_V_FMT 0x00 /* RAW8 */
+#define RAW8_DSP_Ctrl4 0x02
 
-	#define PIX_FMT      V4L2_PIX_FMT_SGRBG10P
-	#define BYTESPERLINE 800 /* 640*1.25 */
-	#define SIZEIMAGE    800 * 480 /* 640*1.25 * 480 */
-	#define COLORSPACE   V4L2_COLORSPACE_RAW
 
-	/* frame size = 0x017700 * 4 = 38400 (640 8 480 @ 10bpp) */
-	#define FRAME_H 0x01
-	#define FRAME_M 0x77
-	#define FRAME_L 0x00
+/* frame size = 0x017700 * 4 = 38400 (640 8 480 @ 10bpp) */
+#define RAW10_FRAME_H 0x01
+#define RAW10_FRAME_M 0x77
+#define RAW10_FRAME_L 0x00
 
-	#define COM7 0x03 /* Bayer RAW */
-	#define V_FMT 0x10 /* RAW10 */
-	#define DSP_Ctrl4 0x03
+#define RAW10_COM7 0x03 /* Bayer RAW */
+#define RAW10_V_FMT 0x10 /* RAW10 */
+#define RAW10_DSP_Ctrl4 0x03
 
-#else // RAW8
-
-	#define PIX_FMT      V4L2_PIX_FMT_SGRBG8
-	//#define PIX_FMT      V4L2_PIX_FMT_GREY
-	#define BYTESPERLINE 640
-	#define SIZEIMAGE    640 * 480
-	#define COLORSPACE   V4L2_COLORSPACE_RAW
-
-	/* frame size = 0x012c00 * 4 = 307200 (640 8 480 @ 8bpp) */
-	#define FRAME_H 0x01
-	#define FRAME_M 0x2c
-	#define FRAME_L 0x00
-
-	#define COM7 0x01 /* Processed Bayer RAW */
-	#define V_FMT 0x00 /* RAW8 */
-	#define DSP_Ctrl4 0x02
-
-#endif
 
 static const struct v4l2_pix_format ov772x_mode[] = {
-	{320, 240, PIX_FMT, V4L2_FIELD_NONE,
+	{320, 240, V4L2_PIX_FMT_SGRBG8, V4L2_FIELD_NONE,
 	 .bytesperline = 320,
 	 .sizeimage = 320 * 240,
 	 .colorspace = V4L2_COLORSPACE_RAW,
 	 .priv = 1},
-	{640, 480, PIX_FMT, V4L2_FIELD_NONE,
-	 .bytesperline = BYTESPERLINE,
-	 .sizeimage = SIZEIMAGE,
-	 .colorspace = COLORSPACE,
+	{640, 480, V4L2_PIX_FMT_SGRBG8, V4L2_FIELD_NONE,
+	 .bytesperline = 640,
+	 .sizeimage = 640 * 480,
+	 .colorspace = V4L2_COLORSPACE_RAW,
+	 .priv = 0},
+	{640, 480, V4L2_PIX_FMT_SGRBG10P, V4L2_FIELD_NONE,
+	 .bytesperline = 800, /* 640*1.25 */
+	 .sizeimage = 800 * 480, /* 640*1.25 * 480 */
+	 .colorspace = V4L2_COLORSPACE_RAW,
 	 .priv = 0},
 };
 
@@ -167,7 +155,13 @@ static const struct framerates ov772x_framerates[] = {
 		.rates = qvga_rates,
 		.nrates = ARRAY_SIZE(qvga_rates),
 	},
-	{ /* 640x480 */
+	{ /* 640x480 8bit */
+		.rates = vga_rates,
+		.nrates = ARRAY_SIZE(vga_rates),
+		.fract_rates = vga_fract_rates,
+		.nfract_rates = ARRAY_SIZE(vga_fract_rates),
+	},
+	{ /* 640x480 10bit */
 		.rates = vga_rates,
 		.nrates = ARRAY_SIZE(vga_rates),
 		.fract_rates = vga_fract_rates,
@@ -492,13 +486,13 @@ static const u8 bridge_init_772x[][2] = {
 
 	{ 0x1c, 0x00 },     /* video data start (V_FMT) */
 
-	{ 0x1d, V_FMT },
+	{ 0x1d, RAW8_V_FMT },
 	{ 0x1d, 0x02 },     /* payload size 0x0200 * 4 = 2048 bytes */
 	{ 0x1d, 0x00 },     /* payload size */
 
-	{ 0x1d, FRAME_H },
-	{ 0x1d, FRAME_M },
-	{ 0x1d, FRAME_L },
+	{ 0x1d, RAW8_FRAME_H },
+	{ 0x1d, RAW8_FRAME_M },
+	{ 0x1d, RAW8_FRAME_L },
 
 	{ 0x1c, 0x0a },     /* video data start (V_CNTL0) */
 	{ 0x1d, 0x08 },     /* turn on UVC header */
@@ -518,7 +512,7 @@ static const u8 sensor_init_772x[][2] = {
 	{ 0x12, 0x80 },     /* reset */
 	{ 0x3d, 0x00 },
 
-	{ 0x12, COM7 },
+	{ 0x12, RAW8_COM7 },
 
 	{ 0x11, 0x01 },
 	{ 0x14, 0x40 },
@@ -526,7 +520,7 @@ static const u8 sensor_init_772x[][2] = {
 	{ 0x63, 0xaa },     // AWB  
 	{ 0x64, 0x87 },
 	{ 0x66, 0x00 },
-	{ 0x67, DSP_Ctrl4 },
+	{ 0x67, RAW8_DSP_Ctrl4 },
 	{ 0x17, 0x26 },
 	{ 0x18, 0xa0 },
 	{ 0x19, 0x07 },
@@ -557,17 +551,18 @@ static const u8 sensor_init_772x[][2] = {
 };
 static const u8 bridge_start_vga_772x[][2] = {
 	{0x1c, 0x00},
-	{0x1d, V_FMT},     /* RAW8/RAW10 mode */
+	{0x1d, RAW8_V_FMT},     /* RAW8/RAW10 mode */
 	{0x1d, 0x02},
 	{0x1d, 0x00},
-	{0x1d, FRAME_H},
-	{0x1d, FRAME_M},
-	{0x1d, FRAME_L},
+	{0x1d, RAW8_FRAME_H},
+	{0x1d, RAW8_FRAME_M},
+	{0x1d, RAW8_FRAME_L},
 	{0xc0, 0x50},
 	{0xc1, 0x3c},
 };
 static const u8 sensor_start_vga_772x[][2] = {
-	{0x12, COM7},
+	{0x67, RAW8_DSP_Ctrl4},
+	{0x12, RAW8_COM7},
 	{0x17, 0x26},
 	{0x18, 0xa0},
 	{0x19, 0x07},
@@ -576,6 +571,29 @@ static const u8 sensor_start_vga_772x[][2] = {
 	{0x2c, 0xf0},
 	{0x65, 0x20},
 };
+static const u8 bridge_start_vga_772x_raw10[][2] = {
+	{0x1c, 0x00},
+	{0x1d, RAW10_V_FMT},     /* RAW8/RAW10 mode */
+	{0x1d, 0x02},
+	{0x1d, 0x00},
+	{0x1d, RAW10_FRAME_H},
+	{0x1d, RAW10_FRAME_M},
+	{0x1d, RAW10_FRAME_L},
+	{0xc0, 0x50},
+	{0xc1, 0x3c},
+};
+static const u8 sensor_start_vga_772x_raw10[][2] = {
+	{0x67, RAW10_DSP_Ctrl4},
+	{0x12, RAW10_COM7},
+	{0x17, 0x26},
+	{0x18, 0xa0},
+	{0x19, 0x07},
+	{0x1a, 0xf0},
+	{0x29, 0xa0},
+	{0x2c, 0xf0},
+	{0x65, 0x20},
+};
+
 static const u8 bridge_start_qvga_772x[][2] = {
 	{0x1c, 0x00},
 	{0x1d, 0x00},
@@ -782,7 +800,7 @@ static void set_frame_rate(struct gspca_dev *gspca_dev)
 		{0.1, 10, 1, 0x3f, 0x01, 0x0a},
 	};
 	static const struct rate_s rate_1[] = {	/* 320x240 */
-/*		{205, 0x01, 0xc1, 0x02},  * 205 FPS: video is partly corrupt */
+/*		{205, 1, 205, 0x01, 0xc1, 0x02},  * 205 FPS: video is partly corrupt */
 		{187, 1, 187, 0x01, 0x81, 0x02}, /* 187 FPS or below: video is valid */
 		{150, 1, 150, 0x00, 0x41, 0x04},
 		{137, 1, 137, 0x02, 0xc1, 0x02},
@@ -1340,7 +1358,7 @@ static int sd_start(struct gspca_dev *gspca_dev)
 {
 	struct sd *sd = (struct sd *) gspca_dev;
 	int mode;
-	static const struct reg_array bridge_start[NSENSORS][2] = {
+	static const struct reg_array bridge_start[NSENSORS][3] = {
 	[SENSOR_OV767x] = {{bridge_start_qvga_767x,
 					ARRAY_SIZE(bridge_start_qvga_767x)},
 			{bridge_start_vga_767x,
@@ -1348,9 +1366,11 @@ static int sd_start(struct gspca_dev *gspca_dev)
 	[SENSOR_OV772x] = {{bridge_start_qvga_772x,
 					ARRAY_SIZE(bridge_start_qvga_772x)},
 			{bridge_start_vga_772x,
-					ARRAY_SIZE(bridge_start_vga_772x)}},
+					ARRAY_SIZE(bridge_start_vga_772x)},
+			{bridge_start_vga_772x_raw10,
+					ARRAY_SIZE(bridge_start_vga_772x_raw10)}},
 	};
-	static const struct reg_array sensor_start[NSENSORS][2] = {
+	static const struct reg_array sensor_start[NSENSORS][3] = {
 	[SENSOR_OV767x] = {{sensor_start_qvga_767x,
 					ARRAY_SIZE(sensor_start_qvga_767x)},
 			{sensor_start_vga_767x,
@@ -1358,7 +1378,9 @@ static int sd_start(struct gspca_dev *gspca_dev)
 	[SENSOR_OV772x] = {{sensor_start_qvga_772x,
 					ARRAY_SIZE(sensor_start_qvga_772x)},
 			{sensor_start_vga_772x,
-					ARRAY_SIZE(sensor_start_vga_772x)}},
+					ARRAY_SIZE(sensor_start_vga_772x)},
+			{sensor_start_vga_772x_raw10,
+					ARRAY_SIZE(sensor_start_vga_772x_raw10)}},
 	};
 
 	/* (from ms-win trace) */
@@ -1366,7 +1388,7 @@ static int sd_start(struct gspca_dev *gspca_dev)
 		sccb_reg_write(gspca_dev, 0x1e, 0x04);
 					/* black sun enable ? */
 
-	mode = gspca_dev->curr_mode;	/* 0: 320x240, 1: 640x480 */
+	mode = gspca_dev->curr_mode;	/* 0: 320x240, 1: 640x480 RAW8, 2: 640x480 RAW10 */
 	reg_w_array(gspca_dev, bridge_start[sd->sensor][mode].val,
 				bridge_start[sd->sensor][mode].len);
 	sccb_w_array(gspca_dev, sensor_start[sd->sensor][mode].val,
